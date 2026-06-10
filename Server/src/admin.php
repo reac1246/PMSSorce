@@ -182,7 +182,7 @@ $all_users = $is_logged_in ? get_users() : [];
                             <tr>
                                 <td><?php echo htmlspecialchars($data['project_name']); ?></td>
                                 <td><code><?php echo htmlspecialchars($num); ?></code></td>
-                                <td>v<?php echo htmlspecialchars($data['latest_version']); ?></td>
+                                <td><?php echo htmlspecialchars($data['latest_version']); ?></td>
                                 <td><?php echo htmlspecialchars($data['owner']); ?></td>
                             </tr>
                         <?php endforeach; ?>
