@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+*.spec.bak
+
+# PyInstaller output
+dist/
+build/
+*.spec
+
+# Log files
+*.log
+BuildError.log
+PMS_LOG.txt
+
+# Secrets / local config
+infomation.psfl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
