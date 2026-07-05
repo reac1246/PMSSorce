@@ -14,6 +14,7 @@ import random
 import string
 import shutil
 import io
+import glob
 
 CONFIG_FILENAME = "infomation.psfl"
 
@@ -25,19 +26,52 @@ HEADERS = {
 def is_secure_mgmt(mgmt_num):
     return mgmt_num.endswith('_Secure')
 
+def get_global_config():
+    path = r"C:\PMS\System\pms_global.json"
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def get_pms_version():
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    ver_path = os.path.join(base_path, "version.txt")
+    if not os.path.exists(ver_path):
+        ver_path = r"C:\PMS\System\version.txt"
+    if os.path.exists(ver_path):
+        try:
+            with open(ver_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except:
+            pass
+    return "Unknown"
+
 def select_api_server():
-    print("\n Please select a server to upload/join")
+    global_cfg = get_global_config()
+    g_api = global_cfg.get("ApiServer", "")
+    
+    print("\n 同期するAPIサーバーを選択してください")
+    if g_api:
+        print(f"0. インストーラーで設定したサーバー ({g_api})")
     print("1. JMN_Cloud (jmn.cloudfree.jp)")
     print("2. JMN_Fukuoka-Tecno (tec-fuk.f5.si)")
-    print("3. Custom User Server")
-    choice = input("> ").strip()
+    print("3. カスタムサーバー")
     
-    if choice == "1":
+    choice = input(f"> {'[Enter=0] ' if g_api else ''}").strip()
+    
+    if not choice and g_api:
+        return g_api
+    elif choice == "0" and g_api:
+        return g_api
+    elif choice == "1":
         return "https://jmn.cloudfree.jp/PMS/api.php"
     elif choice == "2":
         return "https://tec-fuk.f5.si/PMS/api.php"
     else:
-        url = input("Please enter the API server URL (https://.../api.php): ").strip()
+        url = input("APIサーバーのURLを入力してください (例: https://.../api.php): ").strip()
         if url and not url.startswith("http"):
             url = "https://" + url
         return url
@@ -45,7 +79,7 @@ def select_api_server():
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def select_directory(title="Please select a directory"):
+def select_directory(title="ディレクトリを選択してください"):
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True)
@@ -53,7 +87,7 @@ def select_directory(title="Please select a directory"):
     root.destroy()
     return path
 
-def select_multiple_items(title="Please select multiple items"):
+def select_multiple_items(title="複数選択してください"):
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True)
@@ -63,38 +97,42 @@ def select_multiple_items(title="Please select multiple items"):
 
 def show_help():
     print("="*40)
-    print("PMS - Project Management System")
+    print("PMS - プロジェクト管理システム")
     print("="*40)
-    print("Available Commands:")
-    print("  PMS_Start      : Create new project configuration")
-    print("  PMS_Edit       : Edit project configuration")
-    print("  PMS_gui        : Launch GUI configuration window")
-    print("  PMS_pkg        : Build and package the project")
-    print("  PMS_zip        : Folder compression wizard")
-    print("  PMS_syns_setup : Initial setup and upload to sync API server")
-    print("  PMS_syns_join  : Join an existing sync project")
-    print("  PMS_syns       : Sync with API server (Push/Pull)")
-    print("  PMS_syns_edit  : Change management number and settings")
+    print("利用可能なコマンド:")
+    print("  PMS_Start      : プロジェクト設定の新規作成")
+    print("  PMS_Edit       : プロジェクト設定の編集")
+    print("  PMS_gui        : GUI設定画面を起動")
+    print("  PMS_pkg        : プロジェクトのビルドとパッケージ化 (ZIP)")
+    print("  PMS_zip        : フォルダ圧縮ウィザード")
+    print("  PMS_syns_setup : 同期サーバーへの初回アップロードと設定")
+    print("  PMS_syns_join  : 既存の同期プロジェクトへ参加 (ダウンロード)")
+    print("  PMS_syns       : APIサーバーとの同期 (Push/Pull)")
+    print("  PMS_syns_edit  : 管理番号と設定の変更")
+    print("  PMS_Update     : 本ツールのアップデート確認と更新")
     print("="*40)
 
 def pms_start():
-    print("--- PMS_Start: Project Creation Wizard ---")
-    project_name = input("Please enter the Project Name: ").strip()
-    language = input("Please enter the primary language (e.g., Python, Dotnet): ").strip()
+    print("--- PMS_Start: プロジェクト作成ウィザード ---")
+    project_name = input("プロジェクト名を入力してください: ").strip()
+    language = input("メインの言語を入力してください (例: Python, Dotnet): ").strip()
     
     well_known_languages = ["python", "py", "dotnet", "c#", "cpp", "java", "rust", "rs", "cargo"]
     can_compile_auto = language.lower() in well_known_languages
     
     do_compile_pkg = "N"
     if can_compile_auto:
-        do_compile_pkg = input(f"Would you like to compile and compress during PMS_pkg? (Y/N): ").strip().upper()
+        do_compile_pkg = input(f"PMS_pkg 実行時に自動コンパイルを行いますか？ (Y/N): ").strip().upper()
     
-    zip_target = "src"
+    zip_target = input("圧縮対象ディレクトリ (未入力の場合は src となります): ").strip()
+    if not zip_target:
+        zip_target = "src"
+
     is_single_file = False
-    dev_dir = select_directory("Please select the root directory of the project")
+    dev_dir = select_directory("プロジェクトのルートディレクトリを選択してください")
 
     if not dev_dir:
-        print("Error: No directory was selected.")
+        print("エラー: ディレクトリが選択されませんでした。")
         return
 
     if not project_name:
@@ -113,37 +151,40 @@ def pms_start():
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
     
-    print("\nComplete! Saved!")
+    print("\n設定完了！保存しました。")
 
 def pms_syns_setup():
-    print("--- PMS_syns_setup: Sync API Setup ---")
+    print("--- PMS_syns_setup: 同期API設定 ---")
     current_dir = os.getcwd()
     config_path = os.path.join(current_dir, CONFIG_FILENAME)
     config_data = {}
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             config_data = json.load(f)
+    else:
+        print("エラー: 設定ファイルが見つかりません。先に PMS_Start を実行してください。")
+        return
 
     api_server = select_api_server()
     if not api_server: return
 
-    login_id = input("\nID: ").strip()
-    login_pw = input("PW: ").strip()
+    login_id = input("\nログインID: ").strip()
+    login_pw = input("パスワード: ").strip()
     
-    print("Verifying credentials...")
+    print("認証情報を確認しています...")
     try:
         res = requests.post(f"{api_server}?action=verify", json={"login_id": login_id, "login_pw": login_pw}, headers=HEADERS, timeout=5)
         if res.status_code == 200:
-            print("Account is valid. Proceeding.")
+            print("アカウント認証成功。続行します。")
         else:
-            print(f"Error Code: {res.status_code} - {res.text}")
+            print(f"エラーコード: {res.status_code} - {res.text}")
             return
     except Exception as e:
-        print(f"Error: Unable to connect to the server. {e}")
+        print(f"エラー: サーバーに接続できません。{e}")
         return
 
-    print("Please enter the PMS Management Number (PMS ID)")
-    mgmt_prompt = "Enter existing ID starting with 'PMS_', or a new code suffix (leave blank to auto-generate): "
+    print("PMS管理番号 (PMS ID) を入力してください")
+    mgmt_prompt = "'PMS_' から始まる既存のIDを入力、または新規IDのサフィックスを入力 (空白で自動生成): "
     mgmt_input = input(mgmt_prompt).strip()
     
     if not mgmt_input:
@@ -165,7 +206,7 @@ def pms_syns_setup():
                     arcname = os.path.relpath(file_p, current_dir)
                     zipf.write(file_p, arcname)
         
-        print("Uploading to the data server...")
+        print("データサーバーへアップロード中...")
         with open(zip_path, 'rb') as f:
             upload_res = requests.post(
                 f"{api_server}?action=setup",
@@ -178,12 +219,12 @@ def pms_syns_setup():
         if upload_res.status_code == 200:
             result = upload_res.json()
             mgmt_num = result.get("management_number", mgmt_num)
-            print(f"Setup complete. Management Number: {mgmt_num}")
+            print(f"セットアップ完了。管理番号: {mgmt_num}")
         else:
-            print(f"Setup failed: {upload_res.status_code} - {upload_res.text}")
+            print(f"セットアップ失敗: {upload_res.status_code} - {upload_res.text}")
             return
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"エラー: {e}")
         return
     finally:
         if os.path.exists(zip_path): os.remove(zip_path)
@@ -193,11 +234,11 @@ def pms_syns_setup():
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 def pms_syns_edit():
-    print("--- PMS_syns_edit: Change Management Number & Settings ---")
+    print("--- PMS_syns_edit: 管理番号と設定の変更 ---")
     current_dir = os.getcwd()
     config_path = os.path.join(current_dir, CONFIG_FILENAME)
     if not os.path.exists(config_path):
-        print("Configuration file not found.")
+        print("設定ファイルが見つかりません。")
         return
         
     with open(config_path, "r", encoding="utf-8") as f:
@@ -208,23 +249,23 @@ def pms_syns_edit():
     login_pw = config_data.get("LoginPW")
     old_mgmt = config_data.get("ManagementNumber")
     
-    print(f"Current Management Number: {old_mgmt}")
-    new_mgmt = input("Please enter the new Management Number: ").strip()
+    print(f"現在の管理番号: {old_mgmt}")
+    new_mgmt = input("新しい管理番号を入力してください: ").strip()
     if not new_mgmt or new_mgmt == old_mgmt:
-        print("No changes made.")
+        print("変更されませんでした。")
         return
         
     change_key = ""
     old_parts = old_mgmt.split('_')
     new_parts = new_mgmt.split('_')
     if len(old_parts) > 1 and len(new_parts) > 1 and old_parts[1] != new_parts[1]:
-        print("Warning: Detected a change in the UserID portion.")
-        change_key = input("Please enter the ChangeKey issued from admin.php: ").strip()
+        print("警告: ユーザーID部分の変更を検出しました。")
+        change_key = input("admin.php で発行された ChangeKey を入力してください: ").strip()
         if not change_key:
-            print("ChangeKey is required.")
+            print("ChangeKey は必須です。")
             return
 
-    print("Applying changes to the server...")
+    print("サーバーへ変更を適用しています...")
     try:
         res = requests.post(f"{api_server}?action=edit", json={
             "login_id": login_id, "login_pw": login_pw,
@@ -236,36 +277,36 @@ def pms_syns_edit():
             config_data["ManagementNumber"] = new_mgmt
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config_data, f, indent=4, ensure_ascii=False)
-            print(f"Management number successfully updated to {new_mgmt}.")
+            print(f"管理番号を {new_mgmt} に更新しました。")
         else:
-            print(f"Update failed: {res.status_code} - {res.text}")
+            print(f"更新失敗: {res.status_code} - {res.text}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"エラー: {e}")
 
 def pms_syns_join():
-    print("--- PMS_syns_join: Join Project ---")
+    print("--- PMS_syns_join: プロジェクトに参加 ---")
     api_server = select_api_server()
     if not api_server: return
 
-    login_id = input("Please enter Login ID: ").strip()
-    login_pw = input("Please enter Login PW: ").strip()
-    mgmt_num = input("Please enter the PMS Management Number to join: ").strip()
+    login_id = input("ログインIDを入力してください: ").strip()
+    login_pw = input("パスワードを入力してください: ").strip()
+    mgmt_num = input("参加する PMS管理番号 を入力してください: ").strip()
     
     auth_params = {"login_id": login_id, "login_pw": login_pw}
     try:
         res = requests.get(f"{api_server}", params={"action": "info", "management_number": mgmt_num, **auth_params}, headers=HEADERS, timeout=5)
         if res.status_code != 200:
-            print("Project information not found.")
+            print("プロジェクト情報が見つかりません。")
             return
         info = res.json()
-        print(f"Project: {info.get('project_name')} (Ver: {info.get('latest_version')})")
+        print(f"プロジェクト: {info.get('project_name')} (バージョン: {info.get('latest_version')})")
     except Exception as e:
-        print(f"Error: {e}"); return
+        print(f"エラー: {e}"); return
 
-    dev_dir = select_directory("Select destination directory")
+    dev_dir = select_directory("保存先ディレクトリを選択してください")
     if not dev_dir: return
 
-    print("Downloading...")
+    print("ダウンロード中...")
     try:
         res = requests.get(f"{api_server}", params={"action": "download", "management_number": mgmt_num, **auth_params}, headers=HEADERS, timeout=60)
         if res.status_code == 200:
@@ -277,16 +318,16 @@ def pms_syns_join():
             config_data = {"ApiServer": api_server, "LoginID": login_id, "LoginPW": login_pw, "ManagementNumber": mgmt_num}
             with open(os.path.join(dev_dir, CONFIG_FILENAME), "w", encoding="utf-8") as f:
                 json.dump(config_data, f, indent=4, ensure_ascii=False)
-            print("Extraction complete.")
+            print("展開が完了しました。")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"エラー: {e}")
 
 def pms_syns():
-    print("--- PMS_syns: Sync with API Server ---")
+    print("--- PMS_syns: APIサーバーと同期 ---")
     current_dir = os.getcwd()
     config_path = os.path.join(current_dir, CONFIG_FILENAME)
     if not os.path.exists(config_path):
-        print("Configuration file not found.")
+        print("エラー: 設定ファイルが見つかりません。先に PMS_syns_setup または PMS_Start を実行してください。")
         return
         
     with open(config_path, "r", encoding="utf-8") as f:
@@ -298,7 +339,11 @@ def pms_syns():
     mgmt_num = config_data.get("ManagementNumber")
     project_name = config_data.get("ProjectName", "Unknown")
     
-    mode = input("Retrieve(GET) / Send(PUSH) (G/P): ").strip().upper()
+    if not api_server or not login_id or not mgmt_num:
+        print("エラー: サーバー設定が不完全です。PMS_syns_setup を実行してください。")
+        return
+        
+    mode = input("取得(GET) / 送信(PUSH) を選択してください (G/P): ").strip().upper()
     if mode == "P":
         zip_path = os.path.join(current_dir, "sync.zip")
         try:
@@ -311,8 +356,8 @@ def pms_syns():
             
             with open(zip_path, 'rb') as f:
                 res = requests.post(f"{api_server}?action=push", data={"login_id": login_id, "login_pw": login_pw, "management_number": mgmt_num}, files={"file": f}, headers=HEADERS, timeout=30)
-            if res.status_code == 200: print("Upload complete.")
-            else: print(f"Failed: {res.status_code}")
+            if res.status_code == 200: print("アップロード完了。")
+            else: print(f"失敗しました: {res.status_code}")
         finally:
             if os.path.exists(zip_path): os.remove(zip_path)
             
@@ -321,47 +366,47 @@ def pms_syns():
         res = requests.get(api_server, params={"action": "versions", "management_number": mgmt_num, **auth_params}, headers=HEADERS)
         if res.status_code == 200:
             versions = res.json().get("versions", [])
-            print(f"Available Versions: {versions}")
-            target = input("Select Version (Press Enter for latest): ").strip()
+            print(f"利用可能なバージョン: {versions}")
+            target = input("取得するバージョンを選択してください (Enterで最新): ").strip()
             r = requests.get(api_server, params={"action": "download", "management_number": mgmt_num, "version": target, **auth_params}, headers=HEADERS)
             if r.status_code == 200:
                 with open("temp.zip", "wb") as f: f.write(r.content)
                 with zipfile.ZipFile("temp.zip", "r") as z: z.extractall(current_dir)
                 os.remove("temp.zip")
-                print("Download complete.")
+                print("ダウンロード完了。")
 
 def pms_edit():
-    print("--- PMS_Edit: Edit Project Configuration ---")
+    print("--- PMS_Edit: プロジェクト設定の編集 ---")
     current_dir = os.getcwd()
     config_path = os.path.join(current_dir, CONFIG_FILENAME)
     if not os.path.exists(config_path):
-        print(f"Configuration file ({CONFIG_FILENAME}) not found.")
+        print(f"設定ファイル ({CONFIG_FILENAME}) が見つかりません。")
         return
 
     with open(config_path, "r", encoding="utf-8") as f:
         config_data = json.load(f)
 
-    print(f"Current Project Name: {config_data.get('ProjectName')}")
-    new_name = input("New Project Name (Leave blank to keep current): ").strip()
+    print(f"現在のプロジェクト名: {config_data.get('ProjectName')}")
+    new_name = input("新しいプロジェクト名 (空白で変更なし): ").strip()
     if new_name:
         config_data['ProjectName'] = new_name
 
-    print(f"Current Language: {config_data.get('Language')}")
-    new_lang = input("New Language (Leave blank to keep current): ").strip()
+    print(f"現在の言語: {config_data.get('Language')}")
+    new_lang = input("新しい言語 (空白で変更なし): ").strip()
     if new_lang:
         config_data['Language'] = new_lang
 
-    print(f"Current ZipTarget: {config_data.get('ZipTarget')}")
-    new_zip = input("New ZipTarget (e.g. src, Leave blank to keep current): ").strip()
+    print(f"現在の圧縮対象(ZipTarget): {config_data.get('ZipTarget')}")
+    new_zip = input("新しい圧縮対象 (例: src, bin/Release など。空白で変更なし): ").strip()
     if new_zip:
         config_data['ZipTarget'] = new_zip
 
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
-    print("Configuration updated successfully.")
+    print("設定が正常に更新されました。")
 
-def pms_zip():
-    print("--- PMS_zip: Folder Compression Wizard ---")
+def pms_zip(zip_target_override=None):
+    print("--- PMS_zip: フォルダ圧縮ウィザード ---")
     current_dir = os.getcwd()
     config_path = os.path.join(current_dir, CONFIG_FILENAME)
     
@@ -372,45 +417,41 @@ def pms_zip():
         with open(config_path, "r", encoding="utf-8") as f:
             config_data = json.load(f)
             project_name = config_data.get("ProjectName", project_name)
-            target_sub = config_data.get("ZipTarget", "")
+            
+            target_sub = zip_target_override if zip_target_override else config_data.get("ZipTarget", "")
+            
             if target_sub:
                 zip_target = os.path.join(current_dir, target_sub)
             else:
-                # ZipTarget未設定 → ダイアログで選択
-                print("ZipTarget is not set in configuration. Please select the folder to compress.")
-                zip_target = select_directory("Select the folder to compress")
+                print("設定ファイルに ZipTarget が指定されていません。圧縮するフォルダを選択してください。")
+                zip_target = select_directory("圧縮するフォルダを選択")
                 if not zip_target:
-                    print("Cancelled.")
+                    print("キャンセルされました。")
                     return
                 project_name = os.path.basename(zip_target)
     else:
-        print("Project configuration not found. Please manually select the folder to compress.")
-        zip_target = select_directory("Select the folder to compress")
+        print("設定ファイルが見つかりません。圧縮するフォルダを手動で選択してください。")
+        zip_target = select_directory("圧縮するフォルダを選択")
         if not zip_target:
-            print("Cancelled.")
-            return
-        project_name = os.path.basename(zip_target)
-
-    # ZipTargetが指定されているが存在しない場合 → ダイアログで再選択
-    if not os.path.exists(zip_target):
-        print(f"Warning: Configured target directory does not exist: {zip_target}")
-        print("Please manually select the folder to compress.")
-        zip_target = select_directory("Select the folder to compress")
-        if not zip_target:
-            print("Cancelled.")
+            print("キャンセルされました。")
             return
         project_name = os.path.basename(zip_target)
 
     if not os.path.exists(zip_target):
-        print("Error: Selected directory does not exist.")
-        return
+        print(f"警告: 指定されたディレクトリが存在しません: {zip_target}")
+        print("圧縮するフォルダを手動で選択してください。")
+        zip_target = select_directory("圧縮するフォルダを選択")
+        if not zip_target:
+            print("キャンセルされました。")
+            return
+        project_name = os.path.basename(zip_target)
 
-    print("Please select the save destination...")
+    print("保存先を選択してください...")
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True)
     out_zip = filedialog.asksaveasfilename(
-        title="Select where to save the ZIP file",
+        title="ZIPファイルの保存先を選択",
         initialfile=f"{project_name}_export.zip",
         defaultextension=".zip",
         filetypes=[("ZIP Archive", "*.zip")]
@@ -418,11 +459,11 @@ def pms_zip():
     root.destroy()
     
     if not out_zip:
-        print("Save cancelled.")
+        print("保存がキャンセルされました。")
         return
     
-    print(f"Target directory: {zip_target}")
-    print("Compressing...")
+    print(f"圧縮対象: {zip_target}")
+    print("圧縮中...")
     try:
         with zipfile.ZipFile(out_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root_dir, dirs, files in os.walk(zip_target):
@@ -432,16 +473,23 @@ def pms_zip():
                         continue
                     arcname = os.path.relpath(file_p, zip_target)
                     zipf.write(file_p, arcname)
-        print(f"Compression completed! Output path: {out_zip}")
+        print(f"圧縮完了！出力先: {out_zip}")
     except Exception as e:
-        print(f"An error occurred during compression: {e}")
+        print(f"圧縮中にエラーが発生しました: {e}")
+
+def get_dotnet_publish_dir(base_dir):
+    search_path = os.path.join(base_dir, 'bin', 'Release', '*', 'publish')
+    found = glob.glob(search_path)
+    if found:
+        return os.path.relpath(found[0], base_dir)
+    return None
 
 def pms_pkg():
-    print("--- PMS_pkg: Project Build & Packaging ---")
+    print("--- PMS_pkg: プロジェクトビルド & パッケージ化 ---")
     current_dir = os.getcwd()
     config_path = os.path.join(current_dir, CONFIG_FILENAME)
     if not os.path.exists(config_path):
-        print("Configuration file not found. Please run PMS_Start first.")
+        print("エラー: 設定ファイルが見つかりません。先に PMS_Start を実行してください。")
         return
 
     with open(config_path, "r", encoding="utf-8") as f:
@@ -450,29 +498,93 @@ def pms_pkg():
     do_compile = config_data.get("CompileOnPkg", False)
     language = config_data.get("Language", "").lower()
     
+    new_zip_target = None
+    
     if do_compile:
-        print(f"Executing compilation (Language: {language})")
+        print(f"コンパイル処理を実行します (言語: {language})")
         if language in ["python", "py"]:
-            print("Building Python script with PyInstaller...")
-            main_script = input("Main script filename (e.g. main.py): ").strip()
+            print("PyInstaller を使用してビルドします...")
+            main_script = input("メインスクリプトのファイル名 (例: main.py): ").strip()
             if main_script and os.path.exists(main_script):
-                subprocess.run([sys.executable, "-m", "PyInstaller", "--onefile", main_script])
-                print("Build completed.")
+                subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", main_script])
+                print("ビルド完了。出力ディレクトリを 'dist' に設定します。")
+                new_zip_target = "dist"
             else:
-                print("Script not found. Skipping build.")
+                print("スクリプトが見つからないため、ビルドをスキップします。")
+                
         elif language in ["dotnet", "c#"]:
-            print("Executing dotnet build...")
-            subprocess.run(["dotnet", "build", "-c", "Release"])
-            print("Build completed.")
+            print("dotnet publish を実行しています...")
+            subprocess.run(["dotnet", "publish", "-c", "Release", "-p:PublishSingleFile=true"])
+            print("ビルド完了。publish ディレクトリを探しています...")
+            pub_dir = get_dotnet_publish_dir(current_dir)
+            if pub_dir:
+                print(f"publish ディレクトリを発見しました: {pub_dir}")
+                new_zip_target = pub_dir
+            else:
+                print("警告: publish ディレクトリが見つかりませんでした。")
+                
         elif language in ["rust", "rs", "cargo"]:
-            print("Executing cargo build...")
+            print("cargo build を実行しています...")
             subprocess.run(["cargo", "build", "--release"])
-            print("Build completed.")
-        else:
-            print("Automatic compilation for this language is not supported.")
+            print("ビルド完了。")
+            new_zip_target = os.path.join("target", "release")
             
-    print("Proceeding to packaging (Zip creation)...")
-    pms_zip()
+        else:
+            print("この言語の自動コンパイルはサポートされていません。")
+            
+    if new_zip_target:
+        update_cfg = input(f"設定ファイル内の ZipTarget を自動的に '{new_zip_target}' に更新して保存しますか？ (Y/N): ").strip().upper()
+        if update_cfg == "Y":
+            config_data["ZipTarget"] = new_zip_target
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config_data, f, indent=4, ensure_ascii=False)
+            print("ZipTarget を更新しました。")
+
+    print("パッケージ化 (Zip作成) に進みます...")
+    pms_zip(zip_target_override=new_zip_target)
+
+def pms_update():
+    print("--- PMS_Update: アップデートの確認 ---")
+    current_version = get_pms_version()
+    print(f"現在のバージョン: {current_version}")
+    
+    global_cfg = get_global_config()
+    api_server = global_cfg.get("ApiServer", "https://jmn.cloudfree.jp/PMS/api.php")
+    
+    print(f"サーバーに問い合わせ中... ({api_server})")
+    try:
+        res = requests.get(api_server, params={"action": "check_update", "current_version": current_version}, headers=HEADERS, timeout=10)
+        if res.status_code == 200:
+            try:
+                data = res.json()
+            except ValueError:
+                print("サーバーからの応答が正しいJSONではありません。")
+                return
+            has_update = data.get("has_update", False)
+            latest_ver = data.get("latest_version", "")
+            dl_url = data.get("download_url", "")
+            
+            if has_update and dl_url:
+                print(f"新しいバージョン {latest_ver} が見つかりました！")
+                ans = input("アップデートをダウンロードしてインストールしますか？ (Y/N): ").strip().upper()
+                if ans == "Y":
+                    print("ダウンロード中...")
+                    dl_res = requests.get(dl_url, stream=True, headers=HEADERS)
+                    if dl_res.status_code == 200:
+                        installer_path = os.path.join(os.getcwd(), "PMS_Setup_New.exe")
+                        with open(installer_path, "wb") as f:
+                            shutil.copyfileobj(dl_res.raw, f)
+                        print(f"ダウンロード完了。インストーラーを起動します: {installer_path}")
+                        os.startfile(installer_path)
+                        sys.exit(0)
+                    else:
+                        print("ダウンロードに失敗しました。")
+            else:
+                print("現在、最新バージョンを使用しています。")
+        else:
+            print(f"サーバーがアップデートAPIをサポートしていないか、エラーが発生しました: {res.status_code}")
+    except Exception as e:
+        print(f"アップデートの確認中にエラーが発生しました: {e}")
 
 if __name__ == "__main__":
     import sys
@@ -485,13 +597,14 @@ if __name__ == "__main__":
                 import pms_gui
                 pms_gui.run_gui()
             except ImportError as e:
-                print(f"Failed to load GUI module: {e}")
+                print(f"GUIモジュールの読み込みに失敗しました: {e}")
         elif cmd == "pms_pkg": pms_pkg()
         elif cmd == "pms_zip": pms_zip()
         elif cmd == "pms_syns_setup": pms_syns_setup()
         elif cmd == "pms_syns_edit": pms_syns_edit()
         elif cmd == "pms_syns_join": pms_syns_join()
         elif cmd == "pms_syns": pms_syns()
+        elif cmd == "pms_update": pms_update()
         else: show_help()
     else:
         show_help()

@@ -3,6 +3,7 @@ import sys
 import shutil
 import ctypes
 import winreg
+import json
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -67,6 +68,11 @@ def setup_files():
                 shutil.rmtree(dst_src)
             shutil.copytree(src_src, dst_src)
             
+        # Copy version.txt if exists
+        src_ver = os.path.join(base_path, "version.txt")
+        if os.path.exists(src_ver):
+            shutil.copy2(src_ver, os.path.join(target_base, "version.txt"))
+            
         return True, "Files extracted."
     except Exception as e:
         # Save error to a log file next to the installer for debugging
@@ -79,13 +85,23 @@ class InstallerUI:
     def __init__(self, root):
         self.root = root
         self.root.title("PMS Setup")
-        self.root.geometry("400x250")
+        self.root.geometry("450x350")
         
         main_frame = ttk.Frame(root, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         ttk.Label(main_frame, text="PMS - Project Management System", font=("Helvetica", 12, "bold")).pack(pady=10)
         
+        ttk.Label(main_frame, text="Language / 言語:").pack(pady=(10, 2))
+        self.lang_var = tk.StringVar(value="日本語")
+        lang_cb = ttk.Combobox(main_frame, textvariable=self.lang_var, values=["日本語", "English"], state="readonly", width=30)
+        lang_cb.pack(pady=2)
+
+        ttk.Label(main_frame, text="Default API Server:").pack(pady=(10, 2))
+        self.api_var = tk.StringVar(value="https://jmn.cloudfree.jp/PMS/api.php")
+        api_cb = ttk.Combobox(main_frame, textvariable=self.api_var, values=["https://jmn.cloudfree.jp/PMS/api.php", "https://tec-fuk.f5.si/PMS/api.php"], width=40)
+        api_cb.pack(pady=2)
+
         self.btn = ttk.Button(main_frame, text="Install to C:\\PMS\\System", command=self.do_install)
         self.btn.pack(pady=20)
         
@@ -94,7 +110,7 @@ class InstallerUI:
 
     def do_install(self):
         if not is_admin():
-            messagebox.showwarning("Admin Required", "Please run this installer as administrator.")
+            messagebox.showwarning("Admin Required", "Please run this installer as administrator.\n管理者として実行してください。")
             return
 
         self.status.set("Extracting files...")
@@ -112,8 +128,19 @@ class InstallerUI:
         if not path_success:
             messagebox.showerror("Error", f"Failed to set PATH: {path_msg}")
             return
+
+        # Save global configuration
+        try:
+            global_config = {
+                "Language": self.lang_var.get(),
+                "ApiServer": self.api_var.get()
+            }
+            with open(r"C:\PMS\System\pms_global.json", "w", encoding="utf-8") as f:
+                json.dump(global_config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print("Warning: Failed to save global config:", e)
             
-        messagebox.showinfo("Success", "Installation Complete!\nPlease restart your terminal.")
+        messagebox.showinfo("Success", "Installation Complete!\nPlease restart your terminal.\nインストールが完了しました。")
         self.root.destroy()
 
 if __name__ == "__main__":

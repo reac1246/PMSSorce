@@ -29,6 +29,7 @@ def build_package():
         "--console",
         "--icon", "pms_icon.ico",
         "--name", "PMS",
+        "--add-data", f"version.txt{os.pathsep}.",
         # src/ 配下のモジュールを解決するためのパス
         "--paths", os.path.join(os.path.dirname(__file__), "src"),
         "--hidden-import", "pyzipper",
@@ -75,6 +76,11 @@ def build_package():
             fpath = os.path.join(src_dir, fname)
             if os.path.isfile(fpath) and not fname.startswith("__"):
                 add_data_args += ["--add-data", f"{fpath}{os.pathsep}src"]
+
+    # version.txt を追加
+    if os.path.isfile("version.txt"):
+        add_data_args += ["--add-data", f"version.txt{os.pathsep}."]
+
 
     installer_cmd = [
         python, "-m", "PyInstaller",

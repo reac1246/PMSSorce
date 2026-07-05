@@ -356,6 +356,43 @@ if (isset($_GET['action'])) {
         echo json_encode(['status' => 'ok', 'message' => 'Project deleted successfully']);
         break;
 
+    case 'check_update':
+        $current_version = $_GET['current_version'] ?? '0.0.0';
+        $update_info_file = __DIR__ . '/updates/latest.json';
+        
+        if (file_exists($update_info_file)) {
+            $update_info = json_decode(file_get_contents($update_info_file), true);
+            $latest_version = $update_info['version'] ?? '1.0.0';
+            
+            $download_url = $update_info['download_url'] ?? '';
+            // Generate full URL if it's a relative path
+            if ($download_url && !preg_match('/^https?:\/\//', $download_url)) {
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+                $domainName = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $base_url = $protocol . $domainName . dirname($_SERVER['SCRIPT_NAME']);
+                $download_url = rtrim($base_url, '/') . '/' . ltrim($download_url, '/');
+            }
+            
+            // version_compare handles strings like '1.0.5β'. 
+            // Often it ignores non-standard suffixes, so we can strip or just let PHP compare.
+            // Usually '1.0.5' is enough.
+            if (version_compare(preg_replace('/[^0-9\.]/', '', $latest_version), preg_replace('/[^0-9\.]/', '', $current_version), '>')) {
+                echo json_encode([
+                    'has_update' => true,
+                    'latest_version' => $latest_version,
+                    'download_url' => $download_url
+                ]);
+            } else {
+                echo json_encode([
+                    'has_update' => false,
+                    'latest_version' => $latest_version
+                ]);
+            }
+        } else {
+            echo json_encode(['has_update' => false, 'message' => 'Update info not found']);
+        }
+        break;
+
     default:
             http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
