@@ -96,9 +96,23 @@ def build_package():
     ]
     subprocess.run(installer_cmd, check=True)
 
+    print("\n[3/3] Building PMS_Publisher.exe...")
+    publisher_cmd = [
+        python, "-m", "PyInstaller",
+        "--noconfirm",
+        "--onefile",
+        "--windowed",
+        "--icon", "pms_icon.ico",
+        "--name", "PMS_Publisher",
+        "--clean",
+        os.path.join("src", "pms_publisher.py")
+    ]
+    subprocess.run(publisher_cmd, check=True)
+
     print("\n" + "="*30)
     print("BUILD COMPLETE!")
     print("配布物: dist/PMS_Setup.exe")
+    print("        dist/PMS_Publisher.exe")
     print("="*30)
 
 if __name__ == "__main__":

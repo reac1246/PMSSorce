@@ -68,6 +68,20 @@ def setup_files():
                 shutil.rmtree(dst_src)
             shutil.copytree(src_src, dst_src)
             
+        # Generate .bat wrappers for commands in bin
+        dst_bin = os.path.join(target_base, "bin")
+        if not os.path.exists(dst_bin):
+            os.makedirs(dst_bin)
+            
+        commands = [
+            "PMS_Start", "PMS_Edit", "PMS_gui", "PMS_pkg", "PMS_zip",
+            "PMS_syns_setup", "PMS_syns_join", "PMS_syns", "PMS_syns_edit", "PMS_Update"
+        ]
+        for cmd in commands:
+            bat_path = os.path.join(dst_bin, f"{cmd}.bat")
+            with open(bat_path, "w", encoding="utf-8") as f:
+                f.write(f"@echo off\r\n\"{os.path.join(dst_bin, 'PMS.exe')}\" {cmd} %*\r\n")
+            
         # Copy version.txt if exists
         src_ver = os.path.join(base_path, "version.txt")
         if os.path.exists(src_ver):
