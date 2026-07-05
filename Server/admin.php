@@ -81,6 +81,30 @@ if ($is_logged_in && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gen_
     $config = $config_data; // 反映
 }
 
+// Handle Update Distribution
+if ($is_logged_in && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['distribute_update'])) {
+    $version = $_POST['version'] ?? '';
+    $release_notes = $_POST['release_notes'] ?? '';
+    
+    if (isset($_FILES['setup_exe']) && $_FILES['setup_exe']['error'] === UPLOAD_ERR_OK) {
+        $updates_dir = __DIR__ . '/updates';
+        if (!is_dir($updates_dir)) mkdir($updates_dir, 0777, true);
+        
+        $target_file = $updates_dir . '/PMS_Setup.exe';
+        move_uploaded_file($_FILES['setup_exe']['tmp_name'], $target_file);
+        
+        $json_data = [
+            'version' => $version,
+            'download_url' => 'updates/PMS_Setup.exe',
+            'release_notes' => $release_notes
+        ];
+        file_put_contents($updates_dir . '/latest.json', json_encode($json_data, JSON_PRETTY_PRINT));
+        $message = "Update v{$version} distributed successfully.";
+    } else {
+        $error = "Failed to upload setup executable.";
+    }
+}
+
 $all_projects = $is_logged_in ? get_projects() : [];
 $all_users = $is_logged_in ? get_users() : [];
 
@@ -105,13 +129,18 @@ $all_users = $is_logged_in ? get_users() : [];
         .form-group { margin-bottom: 1rem; }
         label { display: block; margin-bottom: 0.5rem; opacity: 0.8; font-size: 0.9rem; }
         input { width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: bold; }
+        button { padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: bold; width: 100%; }
         .btn-danger { background: var(--danger); }
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: var(--card); border-radius: 0.5rem; overflow: hidden; }
         th, td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
         th { background: rgba(255,255,255,0.05); font-weight: 600; }
         .nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .card { background: var(--card); padding: 1.5rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 2rem; }
+        
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 0.5rem; margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .grid-form { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -147,6 +176,30 @@ $all_users = $is_logged_in ? get_users() : [];
         </nav>
 
         <div class="container">
+            <?php if (isset($message)): ?><p style="color: #10b981; font-weight: bold; padding: 1rem; background: rgba(16,185,129,0.1); border-radius: 0.5rem;"><?php echo $message; ?></p><?php endif; ?>
+            <?php if (isset($error) && $error): ?><p style="color: var(--danger); font-weight: bold; padding: 1rem; background: rgba(239,68,68,0.1); border-radius: 0.5rem;"><?php echo $error; ?></p><?php endif; ?>
+            
+            <div class="card">
+                <h2>Update Distribution</h2>
+                <form method="POST" enctype="multipart/form-data" style="display: grid; gap: 1rem; grid-template-columns: 1fr 2fr; align-items: end;">
+                    <div style="grid-column: 1 / -1;">
+                        <label>Setup Executable (PMS_Setup.exe)</label>
+                        <input type="file" name="setup_exe" accept=".exe" required style="background: transparent; border: 1px dashed rgba(255,255,255,0.3); padding: 1rem;">
+                    </div>
+                    <div>
+                        <label>Version Number (e.g. 1.0.6)</label>
+                        <input type="text" name="version" required>
+                    </div>
+                    <div>
+                        <label>Release Notes</label>
+                        <input type="text" name="release_notes">
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <button type="submit" name="distribute_update" style="width: auto; padding: 0.75rem 2rem;">Distribute Update</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="card">
                 <h2>System Settings</h2>
                 <form method="POST">
@@ -161,14 +214,14 @@ $all_users = $is_logged_in ? get_users() : [];
 
             <div class="card">
                 <h2>User Management</h2>
-                <form method="POST" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
-                    <input type="text" name="new_id" placeholder="User/Company ID" required style="flex:1;">
-                    <input type="password" name="new_pw" placeholder="Password" required style="flex:1;">
-                    <select name="type" style="padding: 0.5rem; border-radius: 0.5rem; background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.1);">
+                <form method="POST" class="grid-form">
+                    <input type="text" name="new_id" placeholder="User/Company ID" required>
+                    <input type="password" name="new_pw" placeholder="Password" required>
+                    <select name="type" style="padding: 0.75rem; border-radius: 0.5rem; background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.1);">
                         <option value="regular">Regular User</option>
                         <option value="corporate">Corporate</option>
                     </select>
-                    <button type="submit" name="create_user" style="padding: 0.5rem 1rem;">Create</button>
+                    <button type="submit" name="create_user" style="width: 100%;">Create</button>
                 </form>
 
                 <table>
