@@ -187,7 +187,7 @@ if (isset($_GET['action'])) {
             http_response_code(400);
             die(json_encode(['status' => 'error', 'message' => 'No file uploaded']));
         }
-        $current_ver = $projects[$mgmt_num]['latest_version'];
+        $current_ver = $projects[$mgmt_hash]['latest_version'];
         $parts = explode('.', $current_ver);
         $parts[count($parts)-1]++;
         $new_ver = implode('.', $parts);

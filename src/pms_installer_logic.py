@@ -98,8 +98,8 @@ class InstallerUI:
         lang_cb.pack(pady=2)
 
         ttk.Label(main_frame, text="Default API Server:").pack(pady=(10, 2))
-        self.api_var = tk.StringVar(value="https://jmn.cloudfree.jp/PMS/api.php")
-        api_cb = ttk.Combobox(main_frame, textvariable=self.api_var, values=["https://jmn.cloudfree.jp/PMS/api.php", "https://tec-fuk.f5.si/PMS/api.php"], width=40)
+        self.api_var = tk.StringVar(value="")
+        api_cb = ttk.Combobox(main_frame, textvariable=self.api_var, values=[], width=40)
         api_cb.pack(pady=2)
 
         self.btn = ttk.Button(main_frame, text="Install to C:\\PMS\\System", command=self.do_install)

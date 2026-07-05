@@ -52,29 +52,14 @@ def get_pms_version():
 def select_api_server():
     global_cfg = get_global_config()
     g_api = global_cfg.get("ApiServer", "")
-    
-    print("\n 同期するAPIサーバーを選択してください")
-    if g_api:
-        print(f"0. インストーラーで設定したサーバー ({g_api})")
-    print("1. JMN_Cloud (jmn.cloudfree.jp)")
-    print("2. JMN_Fukuoka-Tecno (tec-fuk.f5.si)")
-    print("3. カスタムサーバー")
-    
-    choice = input(f"> {'[Enter=0] ' if g_api else ''}").strip()
-    
-    if not choice and g_api:
-        return g_api
-    elif choice == "0" and g_api:
-        return g_api
-    elif choice == "1":
-        return "https://jmn.cloudfree.jp/PMS/api.php"
-    elif choice == "2":
-        return "https://tec-fuk.f5.si/PMS/api.php"
-    else:
-        url = input("APIサーバーのURLを入力してください (例: https://.../api.php): ").strip()
-        if url and not url.startswith("http"):
-            url = "https://" + url
-        return url
+    if g_api: return g_api
+
+    print("\nAPIサーバーのURLを入力してください / Enter API Server URL:")
+    print("Example: https://your-server.com/PMS/api.php")
+    url = input("URL: ").strip()
+    if url and not url.startswith("http"):
+        url = "https://" + url
+    return url
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -549,8 +534,12 @@ def pms_update():
     print(f"現在のバージョン: {current_version}")
     
     global_cfg = get_global_config()
-    api_server = global_cfg.get("ApiServer", "https://jmn.cloudfree.jp/PMS/api.php")
+    api_server = global_cfg.get("ApiServer", "")
     
+    if not api_server:
+        print("APIサーバーが設定されていません。PMS_Setup を実行して設定してください。")
+        return
+
     print(f"サーバーに問い合わせ中... ({api_server})")
     try:
         res = requests.get(api_server, params={"action": "check_update", "current_version": current_version}, headers=HEADERS, timeout=10)
