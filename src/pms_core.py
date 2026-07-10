@@ -394,6 +394,20 @@ def pms_edit():
     if new_single in ["Y", "N"]:
         config_data['IsSingleFile'] = (new_single == "Y")
 
+    global_cfg = get_global_config()
+    print(f"現在のAPIサーバー(SV): {global_cfg.get('ApiServer', '')}")
+    new_api = input("新しいAPIサーバーURL (空白で変更なし): ").strip()
+    if new_api:
+        if not new_api.startswith("http"):
+            new_api = "https://" + new_api
+        global_cfg['ApiServer'] = new_api
+        config_data['ApiServer'] = new_api
+        
+        g_path = r"C:\PMS\System\pms_global.json"
+        os.makedirs(os.path.dirname(g_path), exist_ok=True)
+        with open(g_path, "w", encoding="utf-8") as gf:
+            json.dump(global_cfg, gf, indent=4, ensure_ascii=False)
+
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
     print("設定が正常に更新されました。")
@@ -559,17 +573,36 @@ def pms_pkg():
     print("パッケージ化 (Zip作成) に進みます...")
     pms_zip(zip_target_override=new_zip_target)
 
-def pms_update():
+def pms_update(api_url=None):
     print("--- PMS_Update: アップデートの確認 ---")
     current_version = get_pms_version()
     print(f"現在のバージョン: {current_version}")
     
     global_cfg = get_global_config()
-    api_server = global_cfg.get("ApiServer", "")
+    api_server = api_url if api_url else global_cfg.get("ApiServer", "")
     
     if not api_server:
         print("APIサーバーが設定されていません。PMS_Setup を実行して設定してください。")
         return
+
+    if api_server and not api_server.startswith("http"):
+        api_server = "https://" + api_server
+
+    if api_url:
+        lang = global_cfg.get("Language", "日本語")
+        if "日本" in lang:
+            msg = f"今後このSV ({api_server}) を利用するように再登録しますか？ (Y/N): "
+        else:
+            msg = f"Do you want to re-register and use this SV ({api_server}) from now on? (Y/N): "
+        
+        ans = input(msg).strip().upper()
+        if ans == "Y":
+            global_cfg["ApiServer"] = api_server
+            g_path = r"C:\PMS\System\pms_global.json"
+            os.makedirs(os.path.dirname(g_path), exist_ok=True)
+            with open(g_path, "w", encoding="utf-8") as gf:
+                json.dump(global_cfg, gf, indent=4, ensure_ascii=False)
+            print("再登録しました。" if "日本" in lang else "Re-registered.")
 
     print(f"サーバーに問い合わせ中... ({api_server})")
     try:
@@ -624,7 +657,13 @@ if __name__ == "__main__":
         elif cmd == "pms_syns_edit": pms_syns_edit()
         elif cmd == "pms_syns_join": pms_syns_join()
         elif cmd == "pms_syns": pms_syns()
-        elif cmd == "pms_update": pms_update()
+        elif cmd == "pms_update":
+            update_url = None
+            for arg in sys.argv[2:]:
+                if arg.upper().startswith("--URL:"):
+                    update_url = arg[6:]
+                    break
+            pms_update(api_url=update_url)
         else: show_help()
     else:
         show_help()
