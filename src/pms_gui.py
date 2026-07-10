@@ -31,6 +31,9 @@ def run_gui():
     compile_var = tk.BooleanVar()
     ttk.Checkbutton(main_frame, text="ビルドしてからパッケージ化する", variable=compile_var).grid(row=3, column=1, sticky=tk.W, pady=5)
 
+    single_var = tk.BooleanVar()
+    ttk.Checkbutton(main_frame, text="単一ファイル化(OneFile)", variable=single_var).grid(row=3, column=2, sticky=tk.W, pady=5)
+
     # Zip Target
     ttk.Label(main_frame, text="圧縮対象(Zip Target):").grid(row=4, column=0, sticky=tk.W, pady=5)
     zip_var = tk.StringVar(value="src")
@@ -65,6 +68,7 @@ def run_gui():
             "ProjectName": name_entry.get(),
             "Language": lang_entry.get(),
             "CompileOnPkg": compile_var.get(),
+            "IsSingleFile": single_var.get(),
             "ZipTarget": zip_var.get(),
             "DevelopmentDir": dev_path_var.get()
         }

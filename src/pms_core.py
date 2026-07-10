@@ -106,14 +106,17 @@ def pms_start():
     can_compile_auto = language.lower() in well_known_languages
     
     do_compile_pkg = "N"
+    is_single_file = False
     if can_compile_auto:
         do_compile_pkg = input(f"PMS_pkg 実行時に自動コンパイルを行いますか？ (Y/N): ").strip().upper()
+        if do_compile_pkg == "Y":
+            single = input("単一ファイル(OneFile/SingleFile)としてビルドしますか？ (Y/N): ").strip().upper()
+            is_single_file = (single == "Y")
     
     zip_target = input("圧縮対象ディレクトリ (未入力の場合は src となります): ").strip()
     if not zip_target:
         zip_target = "src"
 
-    is_single_file = False
     dev_dir = select_directory("プロジェクトのルートディレクトリを選択してください")
 
     if not dev_dir:
@@ -386,6 +389,11 @@ def pms_edit():
     if new_zip:
         config_data['ZipTarget'] = new_zip
 
+    print(f"現在の単一ファイルビルド(IsSingleFile)設定: {config_data.get('IsSingleFile', False)}")
+    new_single = input("単一ファイルとしてビルドしますか？ (Y/N, 空白で変更なし): ").strip().upper()
+    if new_single in ["Y", "N"]:
+        config_data['IsSingleFile'] = (new_single == "Y")
+
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
     print("設定が正常に更新されました。")
@@ -481,17 +489,24 @@ def pms_pkg():
         config_data = json.load(f)
         
     do_compile = config_data.get("CompileOnPkg", False)
+    is_single_file = config_data.get("IsSingleFile", True)
     language = config_data.get("Language", "").lower()
     
     new_zip_target = None
     
     if do_compile:
-        print(f"コンパイル処理を実行します (言語: {language})")
+        print(f"コンパイル処理を実行します (言語: {language}, 単一ファイル化: {is_single_file})")
         if language in ["python", "py"]:
             print("PyInstaller を使用してビルドします...")
             main_script = input("メインスクリプトのファイル名 (例: main.py): ").strip()
             if main_script and os.path.exists(main_script):
-                subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", main_script])
+                cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm"]
+                if is_single_file:
+                    cmd.append("--onefile")
+                else:
+                    cmd.append("--onedir")
+                cmd.append(main_script)
+                subprocess.run(cmd)
                 print("ビルド完了。出力ディレクトリを 'dist' に設定します。")
                 new_zip_target = "dist"
             else:
@@ -499,7 +514,10 @@ def pms_pkg():
                 
         elif language in ["dotnet", "c#"]:
             print("dotnet publish を実行しています...")
-            subprocess.run(["dotnet", "publish", "-c", "Release", "-p:PublishSingleFile=true"])
+            cmd = ["dotnet", "publish", "-c", "Release"]
+            if is_single_file:
+                cmd.append("-p:PublishSingleFile=true")
+            subprocess.run(cmd)
             print("ビルド完了。publish ディレクトリを探しています...")
             pub_dir = get_dotnet_publish_dir(current_dir)
             if pub_dir:
