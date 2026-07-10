@@ -347,6 +347,8 @@ class PublisherApp(tk.Tk):
         ph_notes = "例: バグ修正、機能追加など"
 
         api     = "" if api     == ph_api   else api
+        if api and not api.startswith("http"):
+            api = "https://" + api
         version = "" if version == ph_ver   else version
         notes   = "" if notes   == ph_notes else notes
 
