@@ -393,6 +393,68 @@ if (isset($_GET['action'])) {
         }
         break;
 
+    case 'distribute_update':
+        // --- Admin authentication (ID + PW + PIN) ---
+        $req_id  = $input['admin_id']  ?? $_POST['admin_id']  ?? '';
+        $req_pw  = $input['admin_pw']  ?? $_POST['admin_pw']  ?? '';
+        $req_pin = $input['admin_pin'] ?? $_POST['admin_pin'] ?? '';
+
+        $cfg_admin_id  = $config['admin']['id']  ?? '';
+        $cfg_admin_pin = $config['admin']['pin'] ?? '';
+
+        // Must match admin ID, admin PIN, and pass standard auth
+        if ($req_id !== $cfg_admin_id || $req_pin !== $cfg_admin_pin || !check_auth($req_id, $req_pw)) {
+            http_response_code(401);
+            die(json_encode(['status' => 'error', 'message' => 'Admin authentication failed. Check ID, Password, and PIN.']));
+        }
+
+        $version       = trim($input['version']       ?? $_POST['version']       ?? '');
+        $release_notes = trim($input['release_notes'] ?? $_POST['release_notes'] ?? '');
+
+        if (empty($version)) {
+            http_response_code(400);
+            die(json_encode(['status' => 'error', 'message' => 'version is required']));
+        }
+
+        if (!isset($_FILES['setup_exe']) || $_FILES['setup_exe']['error'] !== UPLOAD_ERR_OK) {
+            $upload_err = $_FILES['setup_exe']['error'] ?? -1;
+            http_response_code(400);
+            die(json_encode(['status' => 'error', 'message' => "No valid file uploaded (error code: $upload_err)"]));
+        }
+
+        $updates_dir = __DIR__ . '/updates';
+        if (!is_dir($updates_dir)) {
+            mkdir($updates_dir, 0755, true);
+        }
+
+        $target_exe = $updates_dir . '/PMS_Setup.exe';
+        if (!move_uploaded_file($_FILES['setup_exe']['tmp_name'], $target_exe)) {
+            http_response_code(500);
+            die(json_encode(['status' => 'error', 'message' => 'Failed to save uploaded file on server.']));
+        }
+
+        // Build full download URL
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || ($_SERVER['SERVER_PORT'] ?? 80) == 443)
+            ? "https://" : "http://";
+        $base_url = $protocol . ($_SERVER['HTTP_HOST'] ?? 'localhost') . dirname($_SERVER['SCRIPT_NAME'] ?? '/');
+        $dl_url = rtrim($base_url, '/') . '/updates/PMS_Setup.exe';
+
+        $json_data = [
+            'version'       => $version,
+            'download_url'  => 'updates/PMS_Setup.exe',
+            'release_notes' => $release_notes,
+            'released_at'   => date('c'),
+        ];
+        file_put_contents($updates_dir . '/latest.json', json_encode($json_data, JSON_PRETTY_PRINT));
+
+        echo json_encode([
+            'status'       => 'ok',
+            'version'      => $version,
+            'download_url' => $dl_url,
+            'message'      => "Update v{$version} distributed successfully.",
+        ]);
+        break;
+
     default:
             http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => 'Invalid action']);

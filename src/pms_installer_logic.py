@@ -115,6 +115,13 @@ class InstallerUI:
         self.api_var = tk.StringVar(value="")
         api_cb = ttk.Combobox(main_frame, textvariable=self.api_var, values=[], width=40)
         api_cb.pack(pady=2)
+        ttk.Label(
+            main_frame,
+            text="⚠ 例: https://yourdomain.com/PMS/api.php\n※ 末尾まで /api.php と入力してください",
+            foreground="#e67e22",
+            font=("Helvetica", 8),
+            justify="center"
+        ).pack(pady=(0, 2))
 
         self.btn = ttk.Button(main_frame, text="Install to C:\\PMS\\System", command=self.do_install)
         self.btn.pack(pady=20)
