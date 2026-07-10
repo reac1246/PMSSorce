@@ -513,18 +513,31 @@ def pms_pkg():
                 print("スクリプトが見つからないため、ビルドをスキップします。")
                 
         elif language in ["dotnet", "c#"]:
-            print("dotnet publish を実行しています...")
-            cmd = ["dotnet", "publish", "-c", "Release"]
             if is_single_file:
-                cmd.append("-p:PublishSingleFile=true")
-            subprocess.run(cmd)
-            print("ビルド完了。publish ディレクトリを探しています...")
-            pub_dir = get_dotnet_publish_dir(current_dir)
-            if pub_dir:
-                print(f"publish ディレクトリを発見しました: {pub_dir}")
-                new_zip_target = pub_dir
+                print("dotnet publish を実行しています...")
+                cmd = ["dotnet", "publish", "-c", "Release", "-p:PublishSingleFile=true"]
+                subprocess.run(cmd)
+                print("ビルド完了。publish ディレクトリを探しています...")
+                pub_dir = get_dotnet_publish_dir(current_dir)
+                if pub_dir:
+                    print(f"publish ディレクトリを発見しました: {pub_dir}")
+                    new_zip_target = pub_dir
+                else:
+                    print("警告: publish ディレクトリが見つかりませんでした。")
             else:
-                print("警告: publish ディレクトリが見つかりませんでした。")
+                print("dotnet build を実行しています...")
+                cmd = ["dotnet", "build", "-c", "Release"]
+                subprocess.run(cmd)
+                print("ビルド完了。bin/Release を探しています...")
+                # 通常ビルド時は bin/Release/netX.X のようなディレクトリを探す
+                search_path = os.path.join(current_dir, 'bin', 'Release', '*')
+                found = [p for p in glob.glob(search_path) if os.path.isdir(p)]
+                if found:
+                    new_zip_target = os.path.relpath(found[0], current_dir)
+                    print(f"出力ディレクトリを発見しました: {new_zip_target}")
+                else:
+                    new_zip_target = os.path.join("bin", "Release")
+                    print(f"出力ディレクトリを設定: {new_zip_target}")
                 
         elif language in ["rust", "rs", "cargo"]:
             print("cargo build を実行しています...")
